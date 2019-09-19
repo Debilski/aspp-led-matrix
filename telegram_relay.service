@@ -1,0 +1,12 @@
+[Service]
+Environment=API_KEYS=telegram.json
+ExecStart=/home/pi/venv/telegram/bin/python telegram_relay.py tcp://127.0.0.1:12345
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/display16x32/rpi-rgb-led-matrix/bindings/python/samples
+RestartSec=30s
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+

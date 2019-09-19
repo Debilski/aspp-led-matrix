@@ -1,0 +1,7 @@
+[Service]
+ExecStart=/usr/bin/python3 runtext.py -r 16 --led-slowdown-gpio 2 --socket tcp://127.0.0.1:12345
+WorkingDirectory=/home/pi/display16x32/rpi-rgb-led-matrix/bindings/python/samples
+
+[Install]
+WantedBy=multi-user.target
+
