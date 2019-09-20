@@ -37,6 +37,7 @@ async def my_event_handler(event):
     text = event.raw_text
     chat_id = event.chat_id
     sender_id = event.sender_id
+    print("Received", text)
 
     socket.send_json(text)
 

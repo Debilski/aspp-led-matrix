@@ -40,7 +40,7 @@ class RunText(Animation):
         super().__init__(*args, **kwargs)
         self.text = text
         self.font = graphics.Font()
-        self.font.LoadFont("../../../fonts/clR6x12.bdf")
+        self.font.LoadFont("clR6x12.bdf")
         self.textColor = graphics.Color(*color)
         self.pos = None
         self.num_times = num_times
