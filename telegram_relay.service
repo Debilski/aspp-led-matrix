@@ -1,6 +1,6 @@
 [Service]
 Environment=API_KEYS=telegram.json
-ExecStart=/home/pi/venv/telegram/bin/python telegram_relay.py tcp://127.0.0.1:12345
+ExecStart=/home/pi/venv/telegram/bin/python -u telegram_relay.py tcp://127.0.0.1:12345
 Type=simple
 User=pi
 WorkingDirectory=/home/pi/aspp-led-matrix
