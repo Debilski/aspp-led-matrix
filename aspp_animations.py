@@ -68,10 +68,11 @@ class FullFlicker(Animation):
         if tick > 1200:
             return True
 
+# Will draw one step and exit
+# Useful for default animation when nothing else should be running
 class Pacman(Animation):
-    def __init__(self, num_times):
+    def __init__(self):
         self.image = self.image = Image.open('7x7.png').convert('RGB')
-        self.num_times = num_times
         self.pos = None
         self.slowdown = 10
 
@@ -79,17 +80,15 @@ class Pacman(Animation):
         if self.pos is None:
             self.pos = canvas.width
 
-        canvas.SetImage(self.image, -self.pos)
-        canvas.SetImage(self.image, -self.pos + 32)
+        canvas.SetImage(self.image, -self.pos, 3)
+        canvas.SetImage(self.image, -self.pos + 32, 3)
         if self.slowdown == 0:
             self.pos -= 1
             self.slowdown = 10
         self.slowdown -= 1
         if (self.pos <= 0):
-            self.num_times -= 1
-            if self.num_times == 0:
-                return True
             self.pos = canvas.width
+        return True
 
 class Countdown(Animation):
     def __init__(self, color, *args, **kwargs):
@@ -179,7 +178,7 @@ class Animator(SampleBase):
         tick = Tick()
 
         current_animation = None
-        default_animation = Pacman(1)
+        default_animation = Pacman()
 
         while True:
             socks = dict(self.poller.poll(5))
@@ -200,7 +199,7 @@ class Animator(SampleBase):
                     current_animation = animation_queue.get(block=False, timeout=0)
                     tick.reset()
                 except queue.Empty:
-                    current_animation = Pacman(1)
+                    current_animation = default_animation
                     #current_animation = Countdown((200, 0, 0))
 #               if my_text.startswith('/'):
 #                   if my_text == '/stop':
