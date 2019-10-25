@@ -1,6 +1,7 @@
 [Service]
-	Environment=LED_BRIGHTNESS=100
-ExecStart=/usr/bin/python3 -u aspp_animations.py -r 16 --led-slowdown-gpio 2 --socket tcp://127.0.0.1:12345 --led-brightness $LED_BRIGHTNESS
+Environment=LED_BRIGHTNESS=100
+Environment=LED_SLOWDOWN_GPIO=3
+ExecStart=/usr/bin/python3 -u aspp_animations.py -r 16 --led-slowdown-gpio $LED_SLOWDOWN_GPIO --socket tcp://127.0.0.1:12345 --led-brightness $LED_BRIGHTNESS
 WorkingDirectory=/home/pi/aspp-led-matrix
 
 [Install]
