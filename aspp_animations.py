@@ -72,7 +72,7 @@ class FullFlicker(Animation):
 # Useful for default animation when nothing else should be running
 class Pacman(Animation):
     def __init__(self):
-        self.image = self.image = Image.open('7x7.png').convert('RGB')
+        self.image = Image.open('7x7.png').convert('RGB')
         self.pos = None
         self.slowdown = 10
 
@@ -89,6 +89,30 @@ class Pacman(Animation):
         if (self.pos <= 0):
             self.pos = canvas.width
         return True
+
+
+class MixedAnimations(Animation):
+    def __init__(self, *images):
+        self.images = [Image.open(f).convert('RGB') for f in images]
+        self.pos = None
+        self.slowdown = 10
+        self.idx = 0
+
+    def draw(self, canvas, tick):
+        if self.pos is None:
+            self.pos = canvas.width
+
+        canvas.SetImage(self.images[(self.idx + 1) % len(self.images)], -self.pos, 3)
+        canvas.SetImage(self.images[self.idx], -self.pos + 32, 3)
+        if self.slowdown == 0:
+            self.pos -= 1
+            self.slowdown = 10
+        self.slowdown -= 1
+        if (self.pos <= 0):
+            self.pos = canvas.width
+            self.idx = (self.idx + 1) % len(self.images)
+        return True
+
 
 class Countdown(Animation):
     def __init__(self, color, *args, **kwargs):
@@ -178,7 +202,7 @@ class Animator(SampleBase):
         tick = Tick()
 
         current_animation = None
-        default_animation = Pacman()
+        default_animation = MixedAnimations('7x7.png', 'pumpkin.png', 'ghost.png')
 
         while True:
             socks = dict(self.poller.poll(5))
