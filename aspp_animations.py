@@ -11,6 +11,49 @@ from samplebase import SampleBase
 
 animation_queue = queue.Queue(maxsize=10)
 
+import numpy as np
+import colorsys
+
+IMAGES = {}
+
+class Fire:
+    def __init__(self):
+        self.fire = np.zeros((18, 32), dtype=np.uint8)
+        self.palette = np.zeros((256, 3), dtype=np.uint8)
+        for idx, rgb in enumerate(self.palette):
+            h = idx / 6. / 256. + 0.5
+            s = 1
+            l = min(1, idx / 2 / 256.)
+            rgb = colorsys.hls_to_rgb(h, l, s)
+            self.palette[idx] = (int(rgb[0] * 256), int(rgb[1] * 256), int(rgb[2] * 256))
+        self.fire_ = np.empty_like(self.fire)
+        self.anim = MixedAnimations('ghost.png', 'snow.png')
+
+    def draw(self, canvas, tick):
+        self.fire[16, :] = np.random.randint(0, 255, size=32)
+        self.fire[17, :] = np.random.randint(0, 255, size=32)
+        for idx in np.ndindex(*self.fire.shape):
+            r, g, b = self.palette[self.fire[idx]]
+            canvas.SetPixel(idx[1], 16 - idx[0], r, g, b)
+
+        for idx in np.ndindex(*self.fire.shape):
+            y, x = idx
+            try:
+                val = int((
+                    int(self.fire[y + 2, x]) +
+                    int(self.fire[y + 1, x + 1]) +
+                    int(self.fire[y + 1, x - 1]) +
+                    int(self.fire[y + 1, x])) / 4.7)
+            except IndexError:
+                val = 0
+            self.fire_[idx] = val
+
+        self.fire, self.fire_ = self.fire_, self.fire
+        self.anim.draw(canvas, tick)
+        time.sleep(0.1)
+        return True
+
+
 class Tick:
     def __init__(self):
         self.reset()
@@ -90,10 +133,19 @@ class Pacman(Animation):
             self.pos = canvas.width
         return True
 
+def SetImageT(canvas, image, offset_x, offset_y):
+    img_width, img_height = image.size
+    pixels = image.load()
+    for x in range(max(0, -offset_x), min(img_width, canvas.width - offset_x)):
+        for y in range(max(0, -offset_y), min(img_height, canvas.height - offset_y)):
+            (r, g, b, a) = pixels[x, y]
+            if a:
+                canvas.SetPixel(x + offset_x, y + offset_y, r, g, b)
+
 
 class MixedAnimations(Animation):
     def __init__(self, *images):
-        self.images = [Image.open(f).convert('RGB') for f in images]
+        self.images = [Image.open(f).convert('RGBA') for f in images]
         self.pos = None
         self.slowdown = 10
         self.idx = 0
@@ -102,14 +154,14 @@ class MixedAnimations(Animation):
         if self.pos is None:
             self.pos = canvas.width
 
-        canvas.SetImage(self.images[(self.idx + 1) % len(self.images)], -self.pos, 3)
-        canvas.SetImage(self.images[self.idx], -self.pos + 32, 3)
+        SetImageT(canvas, self.images[(self.idx + 1) % len(self.images)], -self.pos, 3)
+        SetImageT(canvas, self.images[self.idx], -self.pos + 32, 3)
         if self.slowdown == 0:
-            self.pos -= 1
+            self.pos += 1
             self.slowdown = 10
         self.slowdown -= 1
-        if (self.pos <= 0):
-            self.pos = canvas.width
+        if (self.pos <= 0 or self.pos > canvas.width):
+            self.pos = self.pos % canvas.width
             self.idx = (self.idx + 1) % len(self.images)
         return True
 
@@ -146,8 +198,15 @@ def parse_command(command):
     print(command)
     if command == '/flicker':
         return [FullFlicker()]
+    if command == '/addimage':
+        rep, image_id, path, *rest = command.split()
+        if Path(path).exists():
+            IMAGES[image_id] = path
+
     if command.startswith('/text '):
         return [RunText(command[5:], (200, 200, 0), 1)]
+    if command.startswith('/alert '):
+        return [RunText(command[6:], (200, 0, 0), 1)]
     if command.startswith('/rep '):
         rep, num, *rest = command.split()
         try:
@@ -202,7 +261,7 @@ class Animator(SampleBase):
         tick = Tick()
 
         current_animation = None
-        default_animation = MixedAnimations('7x7.png', 'pumpkin.png', 'ghost.png')
+        default_animation = Fire() # MixedAnimations('7x7.png', 'pumpkin.png', 'ghost.png')
 
         while True:
             socks = dict(self.poller.poll(5))
