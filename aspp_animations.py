@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
+from pathlib import Path
 import queue
+import random
 import time
 
 import zmq
@@ -52,6 +54,60 @@ class Fire:
         self.anim.draw(canvas, tick)
         time.sleep(0.1)
         return True
+
+class Snow:
+    def __init__(self):
+        self.snow = np.zeros((17, 32), dtype=np.uint8)
+        self.palette = np.zeros((256, 3), dtype=np.uint8)
+        for idx, rgb in enumerate(self.palette):
+            h = 1
+            s = 0
+            l = min(1, idx / 2 / 256.)
+            rgb = colorsys.hls_to_rgb(h, l, s)
+            self.palette[idx] = (int(rgb[0] * 256), int(rgb[1] * 256), int(rgb[2] * 256))
+        self.snow_ = np.empty_like(self.snow)
+        self.anim = MixedAnimations()
+
+    def draw(self, canvas, tick):
+        # Initialise new snow 
+        self.snow[16, :] = 0
+        num_snow = np.random.randint(0, 5)
+        for _ in range(num_snow):
+            snow_pos = np.random.randint(0, 32)
+            self.snow[16, snow_pos] = np.random.randint(0, 255)
+
+        for idx in np.ndindex(*self.snow.shape):
+            r, g, b = self.palette[self.snow[idx]]
+            canvas.SetPixel(idx[1], 15 - idx[0], r, g, b)
+
+
+        # starting from the bottom, we move all snow flakes down one pixel
+        # with a certain chance, the pixel may move to the left or the right
+        # also, its palette colour may be changed slightly
+        for row in range(self.snow.shape[0]):
+            if row == 0:
+#                self.snow_[row, :] = 0
+                continue
+            for col in range(self.snow.shape[1]):
+                val = self.snow[row, col]
+                if val != 0:
+                    val += int(np.random.randn() * 20)
+                    val = max(1, val)
+                    val = min(255, val)
+                # shift?
+                dice = np.random.randint(0, 20)
+                if dice == 0:
+                    col = (col - 1) % 32
+                if dice == 1:
+                    col = (col + 1) % 32
+                self.snow_[row - 1, col] = val
+            self.snow_[idx] = val
+
+        self.snow, self.snow_ = self.snow_, self.snow
+        self.anim.draw(canvas, tick)
+        time.sleep(0.2)
+        return True
+
 
 
 class Tick:
@@ -145,8 +201,13 @@ def SetImageT(canvas, image, offset_x, offset_y):
 
 class MixedAnimations(Animation):
     def __init__(self, *images):
-        self.images = [Image.open(f).convert('RGBA') for f in images]
+        files = list(Path('imgs').glob('*.png'))
+        file = random.choice(files)
+        print("Playing", file)
+        self.image = Image.open(file).convert('RGBA')
+        self.image_next = None
         self.pos = None
+        self.pos_next = None
         self.slowdown = 10
         self.idx = 0
 
@@ -154,15 +215,23 @@ class MixedAnimations(Animation):
         if self.pos is None:
             self.pos = canvas.width
 
-        SetImageT(canvas, self.images[(self.idx + 1) % len(self.images)], -self.pos, 3)
-        SetImageT(canvas, self.images[self.idx], -self.pos + 32, 3)
+        if self.image is None:
+            files = list(Path('imgs').glob('*.png'))
+            file = random.choice(files)
+            print("Playing", file)
+            self.image = Image.open(file).convert('RGBA')
+
+        h = (canvas.height - self.image.height) // 2
+
+        SetImageT(canvas, self.image, self.pos, h)
+
         if self.slowdown == 0:
-            self.pos += 1
-            self.slowdown = 10
+            self.pos -= 1
+            self.slowdown = 5
         self.slowdown -= 1
-        if (self.pos <= 0 or self.pos > canvas.width):
-            self.pos = self.pos % canvas.width
-            self.idx = (self.idx + 1) % len(self.images)
+        if self.pos < - self.image.width:
+            self.pos = None
+            self.image = None
         return True
 
 
@@ -261,7 +330,7 @@ class Animator(SampleBase):
         tick = Tick()
 
         current_animation = None
-        default_animation = Fire() # MixedAnimations('7x7.png', 'pumpkin.png', 'ghost.png')
+        default_animation = Snow() # MixedAnimations('7x7.png', 'pumpkin.png', 'ghost.png')
 
         while True:
             socks = dict(self.poller.poll(5))
