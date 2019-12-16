@@ -210,10 +210,18 @@ class MixedAnimations(Animation):
         self.pos_next = None
         self.slowdown = 10
         self.idx = 0
+        self.tick = 0
 
     def draw(self, canvas, tick):
         if self.pos is None:
             self.pos = canvas.width
+
+#       if self.tick == 0:
+#           self.image = Image.open('imgs/16p_heart_0.png').convert('RGBA')
+#           self.tick = 1
+#       else:
+#           self.image = Image.open('imgs/16p_heart_1.png').convert('RGBA')
+#           self.tick = 0
 
         if self.image is None:
             files = list(Path('imgs').glob('*.png'))
@@ -227,7 +235,7 @@ class MixedAnimations(Animation):
 
         if self.slowdown == 0:
             self.pos -= 1
-            self.slowdown = 5
+            self.slowdown = 2
         self.slowdown -= 1
         if self.pos < - self.image.width:
             self.pos = None
