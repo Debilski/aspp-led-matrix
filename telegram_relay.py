@@ -21,6 +21,16 @@ ctx = zmq.Context()
 socket = ctx.socket(zmq.PUB)
 socket.bind(SOCKET_ADDR)
 
+from netifaces import interfaces, ifaddresses, AF_INET
+
+def ip4_addresses():
+    ip_list = []
+    for interface in interfaces():
+        if interface.startswith('lo'):
+            continue
+        ip_list.append(ifaddresses(interface))
+    return ip_list
+
 async def main():
     # Getting information about yourself
     me = await client.get_me()
@@ -37,10 +47,19 @@ async def my_event_handler(event):
     text = event.raw_text
     chat_id = event.chat_id
     sender_id = event.sender_id
-    print("Received", text)
-
-    socket.send_json(text)
-
+    photo = event.photo
+    print("Received", text, flush=True)
+    if text == '!ip':
+        await event.reply(str(ip4_addresses()))
+    elif photo:
+        print(photo)
+        download_res = await client.download_media(photo, '/tmp/telethon')
+        print("Download done: {}".format(download_res))
+        msg = f"/addimage {text} {download_res}"
+        socket.send_json(msg)
+    else:
+        socket.send_json(text)
 
 client.start()
 client.run_until_disconnected()
+

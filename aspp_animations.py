@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
+from pathlib import Path
 import queue
+import random
 import time
 
 import zmq
@@ -10,6 +12,154 @@ from rgbmatrix import graphics
 from samplebase import SampleBase
 
 animation_queue = queue.Queue(maxsize=10)
+
+import numpy as np
+import colorsys
+
+IMAGES = {}
+
+class Fire:
+    def __init__(self):
+        self.fire = np.zeros((18, 32), dtype=np.uint8)
+        self.palette = np.zeros((256, 3), dtype=np.uint8)
+        for idx, rgb in enumerate(self.palette):
+            h = idx / 6. / 256. + 0.5
+            s = 1
+            l = min(1, idx / 2 / 256.)
+            rgb = colorsys.hls_to_rgb(h, l, s)
+            self.palette[idx] = (int(rgb[0] * 256), int(rgb[1] * 256), int(rgb[2] * 256))
+        self.fire_ = np.empty_like(self.fire)
+        self.anim = MixedAnimations('ghost.png', 'snow.png')
+
+    def draw(self, canvas, tick):
+        self.fire[16, :] = np.random.randint(0, 255, size=32)
+        self.fire[17, :] = np.random.randint(0, 255, size=32)
+        for idx in np.ndindex(*self.fire.shape):
+            r, g, b = self.palette[self.fire[idx]]
+            canvas.SetPixel(idx[1], 16 - idx[0], r, g, b)
+
+        for idx in np.ndindex(*self.fire.shape):
+            y, x = idx
+            try:
+                val = int((
+                    int(self.fire[y + 2, x]) +
+                    int(self.fire[y + 1, x + 1]) +
+                    int(self.fire[y + 1, x - 1]) +
+                    int(self.fire[y + 1, x])) / 4.7)
+            except IndexError:
+                val = 0
+            self.fire_[idx] = val
+
+        self.fire, self.fire_ = self.fire_, self.fire
+        self.anim.draw(canvas, tick)
+        time.sleep(0.1)
+        return True
+
+class Snow:
+    def __init__(self):
+        self.snow = np.zeros((17, 32), dtype=np.uint8)
+        self.palette = np.zeros((256, 3), dtype=np.uint8)
+        for idx, rgb in enumerate(self.palette):
+            h = 1
+            s = 0
+            l = min(1, idx / 2 / 256.)
+            rgb = colorsys.hls_to_rgb(h, l, s)
+            self.palette[idx] = (int(rgb[0] * 256), int(rgb[1] * 256), int(rgb[2] * 256))
+        self.snow_ = np.empty_like(self.snow)
+        self.text = HolidayText()
+        self.anim = Tree()
+
+    def draw(self, canvas, tick):
+        # Initialise new snow 
+        self.snow[16, :] = 0
+        num_snow = np.random.randint(0, 5)
+        for _ in range(num_snow):
+            snow_pos = np.random.randint(0, 32)
+            self.snow[16, snow_pos] = np.random.randint(0, 255)
+
+        for idx in np.ndindex(*self.snow.shape):
+            r, g, b = self.palette[self.snow[idx]]
+            canvas.SetPixel(idx[1], 15 - idx[0], r, g, b)
+
+
+        # starting from the bottom, we move all snow flakes down one pixel
+        # with a certain chance, the pixel may move to the left or the right
+        # also, its palette colour may be changed slightly
+        for row in range(self.snow.shape[0]):
+            if row == 0:
+#                self.snow_[row, :] = 0
+                continue
+            for col in range(self.snow.shape[1]):
+                val = self.snow[row, col]
+                if val != 0:
+                    val += int(np.random.randn() * 20)
+                    val = max(1, val)
+                    val = min(255, val)
+                # shift?
+                dice = np.random.randint(0, 20)
+                if dice == 0:
+                    col = (col - 1) % 32
+                if dice == 1:
+                    col = (col + 1) % 32
+                self.snow_[row - 1, col] = val
+            self.snow_[idx] = val
+
+        self.snow, self.snow_ = self.snow_, self.snow
+        self.text.draw(canvas, tick)
+        self.anim.draw(canvas, tick)
+        time.sleep(0.2)
+        return True
+
+
+class Tree:
+    def __init__(self):
+        self.image = Image.open('imgs/tree.png').convert('RGBA')
+        pixels = self.image.load()
+        self.red_pixels = []
+        for x in range(16):
+            for y in range(16):
+                r, g, b, a = pixels[x, y]
+                if (r, g, b) == (237, 14, 14):
+                    self.red_pixels.append((x, y))
+
+    def draw(self, canvas, tick):
+        SetImageT(canvas, self.image, -1, 0)
+        h, l, s = colorsys.rgb_to_hls(237 / 255, 14 / 255, 14 / 255)
+        for x, y in self.red_pixels:
+            h_ = np.clip(h + random.gauss(0, 0.3), 0, 1)
+            l_ = np.clip(l + random.gauss(0.1, 0.2), 0, 1)
+            s_ = np.clip(s + random.gauss(0, 0.3), 0, 1)
+
+            r, g, b = colorsys.hls_to_rgb(h_, l_, s_)
+            canvas.SetPixel(x, y, int(r * 255), int(g * 255), int(b* 255))
+        return True
+
+class HolidayText:
+    def __init__(self):
+        self.font = graphics.Font()
+        self.font.LoadFont("4x6.bdf")
+
+    def draw(self, canvas, tick):
+        if tick % 20000 < 10000:
+            if random.randint(0, 2) == 0:
+                col = graphics.Color(180, 80, 120)
+                l = graphics.DrawText(canvas, self.font, 12, 5, col, "ITB  ")
+            if random.randint(0, 2) == 0:
+                col = graphics.Color(120, 180, 80)
+                l = graphics.DrawText(canvas, self.font, 12, 5, col, "    A")
+                l = graphics.DrawText(canvas, self.font, 12, 11, col, "dmins")
+            if random.randint(0, 2) == 0:
+                col = graphics.Color(80, 120, 180)
+                l = graphics.DrawText(canvas, self.font, 12, 16, col, "wish")
+        else:
+            if random.randint(0, 2) == 0:
+                col = graphics.Color(180, 120, 80)
+                l = graphics.DrawText(canvas, self.font, 12, 5, col, "Happy")
+            if random.randint(0, 2) == 0:
+                col = graphics.Color(80, 180, 120)
+                l = graphics.DrawText(canvas, self.font, 12, 11, col, "Holyd")
+                l = graphics.DrawText(canvas, self.font, 14, 16, col, "ays")
+        return True
 
 class Tick:
     def __init__(self):
@@ -90,27 +240,57 @@ class Pacman(Animation):
             self.pos = canvas.width
         return True
 
+def SetImageT(canvas, image, offset_x, offset_y):
+    img_width, img_height = image.size
+    pixels = image.load()
+    for x in range(max(0, -offset_x), min(img_width, canvas.width - offset_x)):
+        for y in range(max(0, -offset_y), min(img_height, canvas.height - offset_y)):
+            (r, g, b, a) = pixels[x, y]
+            if a:
+                canvas.SetPixel(x + offset_x, y + offset_y, r, g, b)
+
 
 class MixedAnimations(Animation):
     def __init__(self, *images):
-        self.images = [Image.open(f).convert('RGB') for f in images]
+        files = list(Path('imgs').glob('*.png'))
+        file = random.choice(files)
+        print("Playing", file)
+        self.image = Image.open(file).convert('RGBA')
+        self.image_next = None
         self.pos = None
+        self.pos_next = None
         self.slowdown = 10
         self.idx = 0
+        self.tick = 0
 
     def draw(self, canvas, tick):
         if self.pos is None:
             self.pos = canvas.width
 
-        canvas.SetImage(self.images[(self.idx + 1) % len(self.images)], -self.pos, 3)
-        canvas.SetImage(self.images[self.idx], -self.pos + 32, 3)
+#       if self.tick == 0:
+#           self.image = Image.open('imgs/16p_heart_0.png').convert('RGBA')
+#           self.tick = 1
+#       else:
+#           self.image = Image.open('imgs/16p_heart_1.png').convert('RGBA')
+#           self.tick = 0
+
+        if self.image is None:
+            files = list(Path('imgs').glob('*.png'))
+            file = random.choice(files)
+            print("Playing", file)
+            self.image = Image.open(file).convert('RGBA')
+
+        h = (canvas.height - self.image.height) // 2
+
+        SetImageT(canvas, self.image, self.pos, h)
+
         if self.slowdown == 0:
             self.pos -= 1
-            self.slowdown = 10
+            self.slowdown = 2
         self.slowdown -= 1
-        if (self.pos <= 0):
-            self.pos = canvas.width
-            self.idx = (self.idx + 1) % len(self.images)
+        if self.pos < - self.image.width:
+            self.pos = None
+            self.image = None
         return True
 
 
@@ -146,8 +326,15 @@ def parse_command(command):
     print(command)
     if command == '/flicker':
         return [FullFlicker()]
+    if command == '/addimage':
+        rep, image_id, path, *rest = command.split()
+        if Path(path).exists():
+            IMAGES[image_id] = path
+
     if command.startswith('/text '):
         return [RunText(command[5:], (200, 200, 0), 1)]
+    if command.startswith('/alert '):
+        return [RunText(command[6:], (200, 0, 0), 1)]
     if command.startswith('/rep '):
         rep, num, *rest = command.split()
         try:
@@ -202,7 +389,7 @@ class Animator(SampleBase):
         tick = Tick()
 
         current_animation = None
-        default_animation = MixedAnimations('7x7.png', 'pumpkin.png', 'ghost.png')
+        default_animation = Snow() # MixedAnimations('7x7.png', 'pumpkin.png', 'ghost.png')
 
         while True:
             socks = dict(self.poller.poll(5))
