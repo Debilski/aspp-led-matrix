@@ -66,7 +66,8 @@ class Snow:
             rgb = colorsys.hls_to_rgb(h, l, s)
             self.palette[idx] = (int(rgb[0] * 256), int(rgb[1] * 256), int(rgb[2] * 256))
         self.snow_ = np.empty_like(self.snow)
-        self.anim = MixedAnimations()
+        self.text = HolidayText()
+        self.anim = Tree()
 
     def draw(self, canvas, tick):
         # Initialise new snow 
@@ -104,11 +105,61 @@ class Snow:
             self.snow_[idx] = val
 
         self.snow, self.snow_ = self.snow_, self.snow
+        self.text.draw(canvas, tick)
         self.anim.draw(canvas, tick)
         time.sleep(0.2)
         return True
 
 
+class Tree:
+    def __init__(self):
+        self.image = Image.open('imgs/tree.png').convert('RGBA')
+        pixels = self.image.load()
+        self.red_pixels = []
+        for x in range(16):
+            for y in range(16):
+                r, g, b, a = pixels[x, y]
+                if (r, g, b) == (237, 14, 14):
+                    self.red_pixels.append((x, y))
+
+    def draw(self, canvas, tick):
+        SetImageT(canvas, self.image, -1, 0)
+        h, l, s = colorsys.rgb_to_hls(237 / 255, 14 / 255, 14 / 255)
+        for x, y in self.red_pixels:
+            h_ = np.clip(h + random.gauss(0, 0.3), 0, 1)
+            l_ = np.clip(l + random.gauss(0.1, 0.2), 0, 1)
+            s_ = np.clip(s + random.gauss(0, 0.3), 0, 1)
+
+            r, g, b = colorsys.hls_to_rgb(h_, l_, s_)
+            canvas.SetPixel(x, y, int(r * 255), int(g * 255), int(b* 255))
+        return True
+
+class HolidayText:
+    def __init__(self):
+        self.font = graphics.Font()
+        self.font.LoadFont("4x6.bdf")
+
+    def draw(self, canvas, tick):
+        if tick % 20000 < 10000:
+            if random.randint(0, 2) == 0:
+                col = graphics.Color(180, 80, 120)
+                l = graphics.DrawText(canvas, self.font, 12, 5, col, "ITB  ")
+            if random.randint(0, 2) == 0:
+                col = graphics.Color(120, 180, 80)
+                l = graphics.DrawText(canvas, self.font, 12, 5, col, "    A")
+                l = graphics.DrawText(canvas, self.font, 12, 11, col, "dmins")
+            if random.randint(0, 2) == 0:
+                col = graphics.Color(80, 120, 180)
+                l = graphics.DrawText(canvas, self.font, 12, 16, col, "wish")
+        else:
+            if random.randint(0, 2) == 0:
+                col = graphics.Color(180, 120, 80)
+                l = graphics.DrawText(canvas, self.font, 12, 5, col, "Happy")
+            if random.randint(0, 2) == 0:
+                col = graphics.Color(80, 180, 120)
+                l = graphics.DrawText(canvas, self.font, 12, 11, col, "Holyd")
+                l = graphics.DrawText(canvas, self.font, 14, 16, col, "ays")
+        return True
 
 class Tick:
     def __init__(self):
